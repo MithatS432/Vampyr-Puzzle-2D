@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: d26017e09c44f8e43b2f935f3ebeb175
+guid: 76b8e6f0a3dfabe4784b6b8632a68497
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7711399654269541706
-    second: Vampyr_0
+      213: 8629762179843660594
+    second: Vampyr2_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Vampyr_0
+      name: Vampyr2_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 784
-        height: 1168
+        width: 832
+        height: 1248
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: a4d5ec9f025640b60800000000000000
-      internalID: 7711399654269541706
+      spriteID: 23b9ea9eaf213c770800000000000000
+      internalID: 8629762179843660594
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Vampyr_0: 7711399654269541706
+      Vampyr2_0: 8629762179843660594
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
