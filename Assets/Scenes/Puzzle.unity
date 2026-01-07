@@ -1011,6 +1011,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 483665387}
+  - component: {fileID: 483665388}
   m_Layer: 0
   m_Name: Puzzle Manager
   m_TagString: Untagged
@@ -1033,6 +1034,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &483665388
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 483665386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6f9f7aedf3ae2b47a32cbee7a1949fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  width: 5
+  height: 5
+  tileSpacing: 1.2
+  redPrefab: {fileID: 2513668966216218383, guid: f6e56ffbfdf3ea84e853411192c01a16, type: 3}
+  yellowPrefab: {fileID: 1038459292249008589, guid: c5029899072168d44be54442232eb9ce, type: 3}
+  greenPrefab: {fileID: 2314136271065063202, guid: 2d9eda46020a7274899ec43682fd8c0b, type: 3}
+  bluePrefab: {fileID: 7002601398562394290, guid: 173dea6e5948ef34e8927848bc0159f4, type: 3}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -2354,6 +2374,66 @@ MonoBehaviour:
   continueButtonAnimator: {fileID: 36643640}
   restartButtonAnimator: {fileID: 927555470}
   exitButtonAnimator: {fileID: 2552343}
+--- !u!1 &1415245646
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1415245647}
+  - component: {fileID: 1415245648}
+  m_Layer: 0
+  m_Name: 'ParticleEffectManager   '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1415245647
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1415245646}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.011530362, y: -1.1613852, z: 0.115180016}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1415245648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1415245646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53075b34bce03f94ba0a9bb602d22ac0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  particlePrefab: {fileID: 3790340606127354248, guid: 2eaf258e30e83de43a6a705d596c85bd, type: 3}
+  particleColors:
+  - type: 0
+    color: {r: 1, g: 0, b: 0, a: 0}
+  - type: 1
+    color: {r: 1, g: 1, b: 0, a: 0}
+  - type: 2
+    color: {r: 0, g: 1, b: 0, a: 0}
+  - type: 3
+    color: {r: 0, g: 0, b: 1, a: 0}
+  - type: 4
+    color: {r: 0.5169811, g: 0.088764675, b: 0.088764675, a: 0}
+  - type: 5
+    color: {r: 0.21277593, g: 0.075407565, b: 0.335849, a: 0}
+  - type: 6
+    color: {r: 0.8627451, g: 0.078431375, b: 0.23529412, a: 0}
 --- !u!1 &1447660025
 GameObject:
   m_ObjectHideFlags: 0
@@ -3254,4 +3334,5 @@ SceneRoots:
   - {fileID: 2047848155}
   - {fileID: 1447660028}
   - {fileID: 1305683853}
+  - {fileID: 1415245647}
   - {fileID: 483665387}

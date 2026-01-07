@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 8693388251804113899}
   - component: {fileID: 2526125301854142400}
   - component: {fileID: 3145024663347466264}
+  - component: {fileID: 847781000776371086}
   m_Layer: 0
   m_Name: Blue
   m_TagString: Untagged
@@ -124,3 +125,18 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0.015621216, y: 0.14126909}
   m_Radius: 1.2528698
+--- !u!114 &847781000776371086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7002601398562394290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d860a1595a82bb4ba6fdc854c8a9530, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  x: 0
+  y: 0
+  tileType: 3

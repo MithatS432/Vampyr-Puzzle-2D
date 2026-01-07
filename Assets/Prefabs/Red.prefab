@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6574707802997266573}
   - component: {fileID: 3112741481057411652}
   - component: {fileID: 4284863784879514490}
+  - component: {fileID: -3559262460488455472}
   m_Layer: 0
   m_Name: Red
   m_TagString: Untagged
@@ -124,3 +125,18 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0.013017671, y: 0.11772416}
   m_Radius: 1.2615584
+--- !u!114 &-3559262460488455472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2513668966216218383}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d860a1595a82bb4ba6fdc854c8a9530, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  x: 0
+  y: 0
+  tileType: 0
