@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 5095760524102361455}
   - component: {fileID: 9092353798501646447}
   - component: {fileID: 4876165233404280946}
+  - component: {fileID: 6700984216886222075}
   m_Layer: 0
   m_Name: Blood
   m_TagString: Untagged
@@ -124,3 +125,18 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0.0108852405}
   m_Radius: 1.1382549
+--- !u!114 &6700984216886222075
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4255846708346619471}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d860a1595a82bb4ba6fdc854c8a9530, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  x: 0
+  y: 0
+  tileType: 4

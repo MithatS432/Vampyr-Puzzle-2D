@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7258219369470732503}
   - component: {fileID: 551669995721732493}
   - component: {fileID: 554388734326401708}
+  - component: {fileID: -5885897959209825583}
   m_Layer: 0
   m_Name: Bat
   m_TagString: Untagged
@@ -124,3 +125,18 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0.036542725, y: -0.7673847}
   m_Radius: 3.956074
+--- !u!114 &-5885897959209825583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5042408764328882680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d860a1595a82bb4ba6fdc854c8a9530, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  x: 0
+  y: 0
+  tileType: 5

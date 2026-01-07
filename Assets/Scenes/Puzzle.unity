@@ -1046,13 +1046,38 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6f9f7aedf3ae2b47a32cbee7a1949fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 5
-  height: 5
+  width: 10
+  height: 6
   tileSpacing: 1.2
+  gridYOffset: -1.2
   redPrefab: {fileID: 2513668966216218383, guid: f6e56ffbfdf3ea84e853411192c01a16, type: 3}
   yellowPrefab: {fileID: 1038459292249008589, guid: c5029899072168d44be54442232eb9ce, type: 3}
   greenPrefab: {fileID: 2314136271065063202, guid: 2d9eda46020a7274899ec43682fd8c0b, type: 3}
   bluePrefab: {fileID: 7002601398562394290, guid: 173dea6e5948ef34e8927848bc0159f4, type: 3}
+  bloodDropPrefab: {fileID: 4255846708346619471, guid: b0cb38b37dc51bc498cf01d5a679372a, type: 3}
+  totalMoves: 20
+  targetCount: 20
+  movesText: {fileID: 760518926}
+  targetText: {fileID: 289259610}
+  bloodFillImage: {fileID: 1719431915}
+  currentBlood: 0
+  bloodIncreasePerSecond: 0.05
+  bloodDecreasePerMatch: 0.02
+  vampyrImage: {fileID: 2024006834}
+  vampyrNormal: {fileID: 4899787598035346289, guid: 8a09b03e130b60c459bd3de06d22bf5f, type: 3}
+  vampyrMedium: {fileID: 8629762179843660594, guid: 76b8e6f0a3dfabe4784b6b8632a68497, type: 3}
+  vampyrHungry: {fileID: -2139349737100530108, guid: b863e1cce1fecc14db5f10f8fb0ffb87, type: 3}
+  loseGameAnimator: {fileID: 323690196}
+  winGameAnimator: {fileID: 1861747444}
+  winGamePanel: {fileID: 1861747440}
+  loseGamePanel: {fileID: 323690192}
+  winSound: {fileID: 8300000, guid: 2c66929148bfc0b4f83780ce01274d7b, type: 3}
+  loseSound: {fileID: 8300000, guid: 99434207fe6189f4a8ca5e230c189e27, type: 3}
+  winVFX: {fileID: 7750853977139984564, guid: 6a7b26737f4a19a40b5f385c66dc96a9, type: 3}
+  loseVFX: {fileID: 7640970267051462298, guid: ae9bdcaa1a8496449b1068fd7844906c, type: 3}
+  winvfxSpawnPoint: {fileID: 1753079625}
+  losevfxSpawnPoint: {fileID: 1377085270}
+  particleEffectManager: {fileID: 1415245648}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -2374,6 +2399,37 @@ MonoBehaviour:
   continueButtonAnimator: {fileID: 36643640}
   restartButtonAnimator: {fileID: 927555470}
   exitButtonAnimator: {fileID: 2552343}
+--- !u!1 &1377085269
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1377085270}
+  m_Layer: 0
+  m_Name: 'Lost Spawn '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1377085270
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1377085269}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.046998635, y: 5.15, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1415245646
 GameObject:
   m_ObjectHideFlags: 0
@@ -2900,6 +2956,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1732080552}
   m_CullTransparentMesh: 1
+--- !u!1 &1753079624
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1753079625}
+  m_Layer: 0
+  m_Name: Win Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1753079625
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1753079624}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.046998635, y: -8.53, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1861747440
 GameObject:
   m_ObjectHideFlags: 0
@@ -3329,6 +3416,8 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 265348932}
+  - {fileID: 1753079625}
+  - {fileID: 1377085270}
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 2047848155}

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6312076694356942500}
   - component: {fileID: 8253094633186288105}
   - component: {fileID: 847961263794794596}
+  - component: {fileID: 5934467249895994724}
   m_Layer: 0
   m_Name: Vampyr_0
   m_TagString: Untagged
@@ -124,3 +125,18 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: -0.00000042654142, y: -0.2776584}
   m_Radius: 1.358618
+--- !u!114 &5934467249895994724
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2304968631792453855}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d860a1595a82bb4ba6fdc854c8a9530, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  x: 0
+  y: 0
+  tileType: 6
