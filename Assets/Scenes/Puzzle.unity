@@ -1048,20 +1048,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   width: 10
   height: 6
-  tileSpacing: 1.2
+  tileSpacing: 1.3
   gridYOffset: -1.2
   redPrefab: {fileID: 2513668966216218383, guid: f6e56ffbfdf3ea84e853411192c01a16, type: 3}
   yellowPrefab: {fileID: 1038459292249008589, guid: c5029899072168d44be54442232eb9ce, type: 3}
   greenPrefab: {fileID: 2314136271065063202, guid: 2d9eda46020a7274899ec43682fd8c0b, type: 3}
   bluePrefab: {fileID: 7002601398562394290, guid: 173dea6e5948ef34e8927848bc0159f4, type: 3}
   bloodDropPrefab: {fileID: 4255846708346619471, guid: b0cb38b37dc51bc498cf01d5a679372a, type: 3}
+  batPrefab: {fileID: 5042408764328882680, guid: 7294b8ba5dd6dd945b82b78eef2dacec, type: 3}
   totalMoves: 20
   targetCount: 20
   movesText: {fileID: 760518926}
   targetText: {fileID: 289259610}
   bloodFillImage: {fileID: 1719431915}
-  currentBlood: 0
-  bloodIncreasePerSecond: 0.05
+  currentBlood: 0.1
+  bloodIncreasePerSecond: 0.03
   bloodDecreasePerMatch: 0.02
   vampyrImage: {fileID: 2024006834}
   vampyrNormal: {fileID: 4899787598035346289, guid: 8a09b03e130b60c459bd3de06d22bf5f, type: 3}
@@ -1078,6 +1079,12 @@ MonoBehaviour:
   winvfxSpawnPoint: {fileID: 1753079625}
   losevfxSpawnPoint: {fileID: 1377085270}
   particleEffectManager: {fileID: 1415245648}
+  matchSound: {fileID: 8300000, guid: ab1e730e6a46e494db38aa6daefeb322, type: 3}
+  bloodDropSound: {fileID: 8300000, guid: b4d39f20dc3aa5e45bc8209dc2c547b3, type: 3}
+  batSound: {fileID: 8300000, guid: 26dcc22872c742843a9fa39b38750836, type: 3}
+  enableFastAnimations: 1
+  fastDropDuration: 0.1
+  normalDropDuration: 0.2
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -2456,7 +2463,7 @@ Transform:
   m_GameObject: {fileID: 1415245646}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.011530362, y: -1.1613852, z: 0.115180016}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2490,6 +2497,8 @@ MonoBehaviour:
     color: {r: 0.21277593, g: 0.075407565, b: 0.335849, a: 0}
   - type: 6
     color: {r: 0.8627451, g: 0.078431375, b: 0.23529412, a: 0}
+  useScreenSpace: 1
+  particleScale: 3
 --- !u!1 &1447660025
 GameObject:
   m_ObjectHideFlags: 0

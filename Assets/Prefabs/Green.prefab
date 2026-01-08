@@ -27,13 +27,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2314136271065063202}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0.05503734, w: 0.99848425}
-  m_LocalPosition: {x: 2.2402, y: -1.9405, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0.26547197, w: 0.9641186}
+  m_LocalPosition: {x: 2.2412326, y: -1.9397395, z: 0}
   m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 6.31}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 30.79}
 --- !u!212 &4537693170923753495
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -123,8 +123,8 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.013017684, y: 0.11772428}
-  m_Radius: 1.2765582
+  m_Offset: {x: -0.009691407, y: 0.1672023}
+  m_Radius: 1.3979322
 --- !u!114 &-7433383732869031152
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -140,3 +140,9 @@ MonoBehaviour:
   x: 0
   y: 0
   tileType: 2
+  isSpecial: 0
+  isBloodDrop: 0
+  isVampire: 0
+  isBat: 0
+  bloodDropColor: 2
+  spriteRenderer: {fileID: 4537693170923753495}

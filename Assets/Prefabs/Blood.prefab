@@ -140,3 +140,9 @@ MonoBehaviour:
   x: 0
   y: 0
   tileType: 4
+  isSpecial: 1
+  isBloodDrop: 1
+  isVampire: 0
+  isBat: 0
+  bloodDropColor: 4
+  spriteRenderer: {fileID: 9092353798501646447}
