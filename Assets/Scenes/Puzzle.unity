@@ -1062,7 +1062,7 @@ MonoBehaviour:
   targetText: {fileID: 289259610}
   bloodFillImage: {fileID: 1719431915}
   currentBlood: 0.1
-  bloodIncreasePerSecond: 0.03
+  bloodIncreasePerSecond: 0.1
   bloodDecreasePerMatch: 0.02
   vampyrImage: {fileID: 2024006834}
   vampyrNormal: {fileID: 4899787598035346289, guid: 8a09b03e130b60c459bd3de06d22bf5f, type: 3}

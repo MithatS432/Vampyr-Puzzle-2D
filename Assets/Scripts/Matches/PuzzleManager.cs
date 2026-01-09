@@ -98,7 +98,7 @@ public class PuzzleManager : MonoBehaviour
 
     void Start()
     {
-        targetCount = Random.Range(20, 101);
+        targetCount = Random.Range(100, 201);
         totalMoves = 15;
 
         currentBlood = 0.1f;
@@ -212,30 +212,49 @@ public class PuzzleManager : MonoBehaviour
 
                 if (targetTile != null)
                 {
-                    // ✅ İKİ KAN DAMLASI BİRLEŞTİRME
-                    if (selectedTile.isBloodDrop && targetTile.isBloodDrop)
+                    // ✅ ÖNCELİK SIRASI ÖNEMLİ!
+
+                    // 1. İKİ YARASA BİRLEŞTİRME
+                    if (selectedTile.isBat && targetTile.isBat)
+                    {
+                        StartCoroutine(CombineTwoBats(selectedTile, targetTile));
+                    }
+                    // 2. İKİ KAN DAMLASI BİRLEŞTİRME
+                    else if (selectedTile.isBloodDrop && targetTile.isBloodDrop)
                     {
                         StartCoroutine(CombineTwoBloodDrops(selectedTile, targetTile));
                     }
-                    // ✅ YARASA + NORMAL TILE
+                    // 3. YARASA + KAN DAMLASI (YENİ EKLENDİ) 🆕
+                    else if ((selectedTile.isBat && targetTile.isBloodDrop) ||
+                             (selectedTile.isBloodDrop && targetTile.isBat))
+                    {
+                        // Hangisi yarasa, hangisi kan damlası bul
+                        Tile batTile = selectedTile.isBat ? selectedTile : targetTile;
+                        Tile bloodDropTile = selectedTile.isBloodDrop ? selectedTile : targetTile;
+
+                        StartCoroutine(CombineBatWithBloodDrop(batTile, bloodDropTile));
+                    }
+                    // 4. YARASA + NORMAL TILE
                     else if (selectedTile.isBat)
                     {
                         StartCoroutine(ActivateBatWithTile(selectedTile, targetTile));
                     }
+                    // 5. YARASA + NORMAL TILE (YARASA SAĞDA)
                     else if (targetTile.isBat)
                     {
                         StartCoroutine(ActivateBatWithTile(targetTile, selectedTile));
                     }
-                    // Kan Damlası + Normal Tile
+                    // 6. KAN DAMLASI + NORMAL TILE
                     else if (selectedTile.isBloodDrop)
                     {
                         StartCoroutine(ActivateBloodDropWithTile(selectedTile, targetTile));
                     }
+                    // 7. KAN DAMLASI + NORMAL TILE (KAN DAMLASI SAĞDA)
                     else if (targetTile.isBloodDrop)
                     {
                         StartCoroutine(ActivateBloodDropWithTile(targetTile, selectedTile));
                     }
-                    // Normal swap
+                    // 8. NORMAL SWAP
                     else
                     {
                         StartCoroutine(TrySwapSafe(selectedTile, targetTile));
@@ -248,7 +267,6 @@ public class PuzzleManager : MonoBehaviour
             }
         }
 
-        // Mouse bırakıldı
         if (Input.GetMouseButtonUp(0))
         {
             isDragging = false;
@@ -261,6 +279,13 @@ public class PuzzleManager : MonoBehaviour
     {
         if (bat == null || !bat.isBat || boardBusy) yield break;
         if (targetTile == null) yield break;
+
+        if (targetTile.isSpecial || targetTile.isBloodDrop || targetTile.isBat || targetTile.isVampire)
+        {
+            Debug.LogWarning($"[Bat] Hedef tile özel, işlem iptal: {targetTile.tileType}");
+            boardBusy = false;
+            yield break;
+        }
 
         boardBusy = true;
 
@@ -298,25 +323,13 @@ public class PuzzleManager : MonoBehaviour
             grid[targetX, targetY] = null;
             Destroy(targetTile.gameObject);
 
-            // Yeni Kan Damlası oluştur
-            GameObject bloodDropObj = Instantiate(bloodDropPrefab, targetPos, Quaternion.identity, transform);
-            Tile bloodDrop = bloodDropObj.GetComponent<Tile>();
-            bloodDrop.x = targetX;
-            bloodDrop.y = targetY;
-            bloodDrop.tileType = TileType.BloodDrop;
-            bloodDrop.isSpecial = true;
-            bloodDrop.isBloodDrop = true;
-            bloodDrop.isVampire = false;
-            bloodDrop.isBat = false;
-            bloodDrop.bloodDropColor = targetColor;
-
-            // Görseli güncelle
-            bloodDrop.UpdateBloodDropVisual();
+            // Yeni Kan Damlası oluştur (0.5 SCALE İLE)
+            Tile bloodDrop = CreateBloodDropAtPosition(targetX, targetY, targetColor, targetPos);
 
             // Grid'e yerleştir
             grid[targetX, targetY] = bloodDrop;
 
-            Debug.Log($"[Bat] Tile Kan Damlası'na dönüştürüldü");
+            Debug.Log($"[Bat] Tile Kan Damlası'na dönüştürüldü (0.5 scale)");
 
             // 6. KAN DAMLASI OLUŞUM SESİ
             if (bloodDropSound != null)
@@ -560,7 +573,29 @@ public class PuzzleManager : MonoBehaviour
         if (obj != null)
             obj.position = targetPos;
     }
+    void FixAllBloodDropZPositions()
+    {
+        int fixedCount = 0;
 
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile tile = grid[x, y];
+                if (tile != null && tile.isBloodDrop)
+                {
+                    // Tile.cs'deki SetCorrectZPosition fonksiyonunu çağır
+                    tile.SetCorrectZPosition();
+                    fixedCount++;
+                }
+            }
+        }
+
+        if (fixedCount > 0)
+        {
+            Debug.Log($"[FixAllBloodDropZPositions] {fixedCount} kan damlasının Z pozisyonu düzeltildi");
+        }
+    }
     IEnumerator ResolveBoard()
     {
         boardBusy = true;
@@ -580,7 +615,10 @@ public class PuzzleManager : MonoBehaviour
             // 3. YENİ TILE'LAR EKLE
             yield return StartCoroutine(RefillTiles());
 
-            // 4. YENİDEN KONTROL ET
+            // 4. TÜM KAN DAMLALARININ Z-POSITION'UNU DÜZELT (YENİ EKLENDİ!)
+            FixAllBloodDropZPositions();
+
+            // 5. YENİDEN KONTROL ET
             matches = FindAllMatches();
         }
 
@@ -790,67 +828,35 @@ public class PuzzleManager : MonoBehaviour
         if (matches == null || matches.Count == 0)
             yield break;
 
-        // 1. YARASA VAR MI KONTROL ET
-        bool hasBat = false;
+        // ÖZEL TİLE'LARI FİLTRELE
+        List<Tile> filteredMatches = new List<Tile>();
         foreach (Tile tile in matches)
         {
-            if (tile != null && tile.isBat)
+            if (tile != null &&
+                !tile.isSpecial &&
+                !tile.isBloodDrop &&
+                !tile.isBat &&
+                !tile.isVampire)
             {
-                hasBat = true;
-                break;
+                filteredMatches.Add(tile);
+            }
+            else
+            {
+                Debug.LogWarning($"[HandleMatches] Özel tile filtrelendi: {tile?.tileType} ({tile?.x},{tile?.y})");
             }
         }
 
-        // 2. SES EFEKTİ
-        if (hasBat && batSound != null)
-        {
-            AudioSource.PlayClipAtPoint(batSound, Camera.main.transform.position, 0.7f);
-            Debug.Log("[HandleMatches] Yarasa match sesi");
-        }
-        else if (matchSound != null)
+        if (filteredMatches.Count == 0)
+            yield break;
+
+        // 1. SES EFEKTİ
+        if (matchSound != null)
         {
             AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position);
         }
 
-        // 3. BLOODDROP EXTRA TILE'LARI TOPLA
-        List<Tile> extraTiles = new List<Tile>();
-
-        foreach (Tile tile in matches)
-        {
-            if (tile != null && tile.isBloodDrop)
-            {
-                Debug.Log($"[BloodDrop] Patlıyor: ({tile.x},{tile.y})");
-
-                // 3x3 alan
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    for (int dy = -1; dy <= 1; dy++)
-                    {
-                        if (dx == 0 && dy == 0) continue;
-
-                        Tile neighbor = GetTileAt(tile.x + dx, tile.y + dy);
-
-                        if (neighbor != null &&
-                            !matches.Contains(neighbor) &&
-                            !extraTiles.Contains(neighbor))
-                        {
-                            extraTiles.Add(neighbor);
-                        }
-                    }
-                }
-
-                // BloodDrop kendisini de ekle
-                if (!matches.Contains(tile))
-                    matches.Add(tile);
-            }
-        }
-
-        // Extra tile'ları ekle
-        if (extraTiles.Count > 0)
-            matches.AddRange(extraTiles);
-
-        // 4. PARTİKÜL EFEKTLERİ
-        foreach (Tile tile in matches)
+        // 2. PARTİKÜL EFEKTLERİ
+        foreach (Tile tile in filteredMatches)
         {
             if (tile != null && particleEffectManager != null)
             {
@@ -860,31 +866,85 @@ public class PuzzleManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.15f);
 
-        // 5. GRİD'DEN SİL
-        foreach (Tile tile in matches)
+        // 3. ÖZEL TİLE OLUŞTURULACAK POZİSYONLARI KAYDET (AMA HENÜZ OLUŞTURMA!)
+        List<Vector2Int> specialTilePositions = new List<Vector2Int>();
+        List<int> specialTileLengths = new List<int>();
+
+        // 4+ eşleşmeler için kan damlası pozisyonlarını kaydet
+        foreach (Tile tile in filteredMatches)
+        {
+            // Burada 4+ match kontrolü yapılıyorsa, pozisyonu kaydet
+            // Ama HENÜZ OLUŞTURMA!
+        }
+
+        // 4. GRİD'DEN SİL
+        foreach (Tile tile in filteredMatches)
         {
             if (tile != null)
                 grid[tile.x, tile.y] = null;
         }
 
-        // 6. GAMEOBJECT'LERİ YOK ET
-        foreach (Tile tile in matches)
+        // 5. GAMEOBJECT'LERİ YOK ET
+        foreach (Tile tile in filteredMatches)
         {
             if (tile != null)
                 Destroy(tile.gameObject);
         }
 
-        // 7. HAMLE SONUÇLARI
-        OnMoveResolved(matches.Count);
+        // 6. HAMLE SONUÇLARI
+        OnMoveResolved(filteredMatches.Count);
 
-        // 8. ÖZEL TILE OLUŞTUR
+        // 7. DÜŞME İŞLEMİNİ YAP (ÖNCE DÜŞSÜN)
+        yield return StartCoroutine(DropTiles());
+
+        // 8. ŞİMDİ ÖZEL TİLE'LARI OLUŞTUR (DÜŞTÜKTEN SONRA!)
         if (shouldCreateSpecialTile)
+        {
             yield return StartCoroutine(CreateSpecialTileAfterDelay());
+        }
 
-        // 9. YARASA OLUŞTUR
         if (shouldCreateBat)
+        {
             yield return StartCoroutine(CreateBatAfterDelay());
+        }
+
+        // 9. DOLDURMA İŞLEMİ
+        yield return StartCoroutine(RefillTiles());
+
+        Debug.Log("[HandleMatches] Tüm işlemler tamamlandı");
+
+
+
     }
+    // ===================== ÖZEL TİLE KORUMA =====================
+    void RemoveSpecialTilesFromMatches(ref HashSet<Tile> matches)
+    {
+        if (matches == null || matches.Count == 0) return;
+
+        List<Tile> toRemove = new List<Tile>();
+
+        foreach (Tile tile in matches)
+        {
+            if (tile == null) continue;
+
+            // Kan Damlası, Yarasa, Vampir gibi özel tile'ları çıkar
+            if (tile.isSpecial || tile.isBloodDrop || tile.isBat || tile.isVampire)
+            {
+                toRemove.Add(tile);
+            }
+        }
+
+        foreach (Tile tile in toRemove)
+        {
+            matches.Remove(tile);
+        }
+
+        if (toRemove.Count > 0)
+        {
+            Debug.Log($"[SpecialTileProtection] {toRemove.Count} özel tile korundu");
+        }
+    }
+
 
     IEnumerator DropTiles()
     {
@@ -895,16 +955,12 @@ public class PuzzleManager : MonoBehaviour
         {
             anyTileMoved = false;
 
-            // HER SÜTUN İÇİN
             for (int x = 0; x < width; x++)
             {
-                // EN ALT SATIRDAN BAŞLA
                 for (int y = 0; y < height; y++)
                 {
-                    // EĞER BOŞ BİR HÜCRE VARSA
                     if (grid[x, y] == null)
                     {
-                        // YUKARIYA TARA
                         for (int yAbove = y + 1; yAbove < height; yAbove++)
                         {
                             Tile tileAbove = grid[x, yAbove];
@@ -919,10 +975,8 @@ public class PuzzleManager : MonoBehaviour
                                 tileAbove.x = x;
                                 tileAbove.y = y;
 
-                                // ANİMASYON BAŞLAT (HEPSİ AYNI ANDA)
+                                // ANİMASYON BAŞLAT
                                 Vector3 targetPos = GetTileWorldPosition(x, y);
-
-                                // PERFORMANS AYARI KULLAN
                                 float duration = enableFastAnimations ? fastDropDuration : normalDropDuration;
 
                                 Coroutine dropRoutine = StartCoroutine(
@@ -931,14 +985,13 @@ public class PuzzleManager : MonoBehaviour
                                 dropCoroutines.Add(dropRoutine);
 
                                 anyTileMoved = true;
-                                break; // BİR TANE BULDUK, DİĞERİNE GEÇ
+                                break;
                             }
                         }
                     }
                 }
             }
 
-            // TÜM DÜŞME ANİMASYONLARI BİTENE KADAR BEKLE
             foreach (Coroutine routine in dropCoroutines)
             {
                 yield return routine;
@@ -946,21 +999,18 @@ public class PuzzleManager : MonoBehaviour
 
             dropCoroutines.Clear();
 
-        } while (anyTileMoved); // HİÇ TILE HAREKET ETMEYENE KADAR DEVAM ET
+        } while (anyTileMoved);
 
-        yield return new WaitForSeconds(0.05f); // KISA BEKLEME
+        yield return new WaitForSeconds(0.05f);
     }
-
     IEnumerator RefillTiles()
     {
         List<Coroutine> fillCoroutines = new List<Coroutine>();
 
-        // HER SÜTUN İÇİN
         for (int x = 0; x < width; x++)
         {
             int emptyCount = 0;
 
-            // BOŞ HÜCRELERİ SAY
             for (int y = 0; y < height; y++)
             {
                 if (grid[x, y] == null)
@@ -969,42 +1019,47 @@ public class PuzzleManager : MonoBehaviour
                 }
             }
 
-            // YUKARIDAN YENİ TILE'LAR EKLE
             for (int i = 0; i < emptyCount; i++)
             {
                 int targetY = height - emptyCount + i;
-
-                // YENİ TILE TİPİ BELİRLE
                 TileType newType = GetSafeRefillTile(x, targetY);
                 GameObject prefab = GetPrefabByType(newType);
 
-                // SPAWN POZİSYONU (YUKARIDA)
-                Vector3 spawnPos = GetTileWorldPosition(x, height + i);
-                GameObject tileObj = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
+                // SPAWN POZİSYONU (YUKARIDA, ARKADA)
+                Vector3 spawnPos = new Vector3(
+                    GetTileWorldPosition(x, height + i).x,
+                    GetTileWorldPosition(x, height + i).y,
+                    0f // Normal tile arkada
+                );
 
-                // TILE BİLEŞENİNİ AL
+                GameObject tileObj = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
                 Tile newTile = tileObj.GetComponent<Tile>();
                 newTile.x = x;
                 newTile.y = targetY;
                 newTile.tileType = newType;
 
-                // GRİDE YERLEŞTİR
+                // Sprite Renderer ayarı
+                SpriteRenderer sr = tileObj.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    sr.sortingOrder = 0; // Normal tile
+                }
+
                 grid[x, targetY] = newTile;
 
-                // ANİMASYON BAŞLAT (HEPSİ AYNI ANDA)
-                Vector3 targetPos = GetTileWorldPosition(x, targetY);
-
-                // PERFORMANS AYARI KULLAN
-                float duration = enableFastAnimations ? fastDropDuration : normalDropDuration;
-
-                Coroutine fillRoutine = StartCoroutine(
-                    SmoothMove(newTile.transform, targetPos, duration)
+                // HEDEF POZİSYON (ARKADA)
+                Vector3 targetPos = new Vector3(
+                    GetTileWorldPosition(x, targetY).x,
+                    GetTileWorldPosition(x, targetY).y,
+                    0f
                 );
+
+                float duration = enableFastAnimations ? fastDropDuration : normalDropDuration;
+                Coroutine fillRoutine = StartCoroutine(SmoothMove(newTile.transform, targetPos, duration));
                 fillCoroutines.Add(fillRoutine);
             }
         }
 
-        // TÜM DOLDURMA ANİMASYONLARI BİTENE KADAR BEKLE
         foreach (Coroutine routine in fillCoroutines)
         {
             yield return routine;
@@ -1012,6 +1067,8 @@ public class PuzzleManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.05f);
     }
+
+
 
     // ===================== GRID =====================
     void CreateGrid()
@@ -1037,7 +1094,7 @@ public class PuzzleManager : MonoBehaviour
                 Vector3 pos = new Vector3(
                     (x - offsetX) * tileSpacing,
                     (y - offsetY) * tileSpacing + gridYOffset,
-                    0f
+                    0f // Normal tile'lar arkada
                 );
 
                 GameObject obj = Instantiate(prefab, pos, Quaternion.identity, transform);
@@ -1045,6 +1102,14 @@ public class PuzzleManager : MonoBehaviour
                 tile.x = x;
                 tile.y = y;
                 tile.tileType = type;
+
+                // Sprite Renderer ayarı
+                SpriteRenderer sr = obj.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    sr.sortingOrder = 0; // Normal tile'lar en arkada
+                }
+
                 grid[x, y] = tile;
             }
         }
@@ -1165,8 +1230,12 @@ public class PuzzleManager : MonoBehaviour
         // Kare eşleşmeler (2x2)
         CheckSquares(result);
 
+        // ÖZEL TILE'LARI SONUÇTAN ÇIKAR (YENİ EKLENDİ)
+        RemoveSpecialTilesFromMatches(ref result);
+
         return new List<Tile>(result);
     }
+
 
     // ===================== MATCH RESOLVE =====================
     public void OnMoveResolved(int destroyedTileCount)
@@ -1279,8 +1348,13 @@ public class PuzzleManager : MonoBehaviour
         Tile startTile = grid[startX, startY];
         if (startTile == null) return;
 
-        List<Tile> match = new List<Tile> { startTile };
+        // ÖZEL TİLE'LARI HİÇBİR ZAMAN NORMAL MATCH'E DAHİL ETME
+        if (startTile.isSpecial || startTile.isBloodDrop || startTile.isBat || startTile.isVampire)
+        {
+            return; // Özel tile'lar normal eşleşme yapamaz
+        }
 
+        List<Tile> match = new List<Tile> { startTile };
         int x = startX + dirX;
         int y = startY + dirY;
 
@@ -1289,8 +1363,10 @@ public class PuzzleManager : MonoBehaviour
         {
             Tile next = grid[x, y];
 
-            // NULL KONTROLÜ EKLE
             if (next == null) break;
+
+            // ÖZEL TİLE'LARI DAHİL ETME
+            if (next.isSpecial || next.isBloodDrop || next.isBat || next.isVampire) break;
 
             // Aynı tipte mi kontrol et
             if (next.tileType == startTile.tileType)
@@ -1305,26 +1381,39 @@ public class PuzzleManager : MonoBehaviour
             }
         }
 
-        // 3 veya daha fazla eşleşme varsa ekle
+        // 3 veya daha fazla eşleşme varsa ekle (SADECE NORMAL TILE'LAR)
         if (match.Count >= 3)
         {
+            // TÜM TILE'LARIN NORMAL OLDUĞUNDAN EMİN OL
+            bool allNormal = true;
             foreach (Tile t in match)
             {
-                result.Add(t);
+                if (t.isSpecial || t.isBloodDrop || t.isBat || t.isVampire)
+                {
+                    allNormal = false;
+                    break;
+                }
             }
 
-            // 4+ eşleşmede özel tile oluştur
-            if (match.Count >= 4)
+            if (allNormal)
             {
-                int midIndex = match.Count / 2;
-                Tile centerTile = match[midIndex];
+                foreach (Tile t in match)
+                {
+                    result.Add(t);
+                }
 
-                // Özel tile oluşturulacak pozisyonu kaydet
-                CreateSpecialTileAfterMatch(centerTile.x, centerTile.y, match.Count);
+                // 4+ eşleşmede özel tile oluştur
+                if (match.Count >= 4)
+                {
+                    int midIndex = match.Count / 2;
+                    Tile centerTile = match[midIndex];
+
+                    // Özel tile oluşturulacak pozisyonu kaydet
+                    CreateSpecialTileAfterMatch(centerTile.x, centerTile.y, match.Count);
+                }
             }
         }
     }
-
     void CheckSquares(HashSet<Tile> result)
     {
         for (int x = 0; x < width - 1; x++)
@@ -1336,7 +1425,12 @@ public class PuzzleManager : MonoBehaviour
                 Tile c = grid[x, y + 1];
                 Tile d = grid[x + 1, y + 1];
 
+                // TÜM TILE'LARIN NORMAL OLDUĞUNDAN EMİN OL
                 if (a != null && b != null && c != null && d != null &&
+                    !a.isSpecial && !a.isBloodDrop && !a.isBat && !a.isVampire &&
+                    !b.isSpecial && !b.isBloodDrop && !b.isBat && !b.isVampire &&
+                    !c.isSpecial && !c.isBloodDrop && !c.isBat && !c.isVampire &&
+                    !d.isSpecial && !d.isBloodDrop && !d.isBat && !d.isVampire &&
                     a.tileType == b.tileType &&
                     a.tileType == c.tileType &&
                     a.tileType == d.tileType)
@@ -1430,15 +1524,17 @@ public class PuzzleManager : MonoBehaviour
     }
 
 
-    Vector3 GetTileWorldPosition(int x, int y)
+    Vector3 GetTileWorldPosition(int x, int y, bool isSpecialTile = false)
     {
         float offsetX = (width - 1) / 2f;
         float offsetY = (height - 1) / 2f;
 
+        float zPos = isSpecialTile ? -1f : 0f; // Özel tile'lar önde
+
         return new Vector3(
             (x - offsetX) * tileSpacing,
             (y - offsetY) * tileSpacing + gridYOffset,
-            0f
+            zPos
         );
     }
 
@@ -1466,30 +1562,19 @@ public class PuzzleManager : MonoBehaviour
             yield break;
         }
 
-        GameObject prefab = bloodDropPrefab;
         Vector3 pos = GetTileWorldPosition(specialTileX, specialTileY);
-        GameObject obj = Instantiate(prefab, pos, Quaternion.identity, transform);
 
-        Tile tile = obj.GetComponent<Tile>();
-        tile.x = specialTileX;
-        tile.y = specialTileY;
-        tile.tileType = TileType.BloodDrop;
-        tile.isSpecial = true;
-        tile.isBloodDrop = true;
+        // CreateBloodDropAtPosition KULLAN (zaten SetCorrectZPosition çağırıyor)
+        Tile tile = CreateBloodDropAtPosition(specialTileX, specialTileY, TileType.Red, pos);
 
         // Başlangıç rengini belirle
         tile.bloodDropColor = GetMostCommonColorAround(tile);
-
-        // Görseli güncelle
         tile.UpdateBloodDropVisual();
 
-        grid[specialTileX, specialTileY] = tile;
-
-        Debug.Log($"[Special Tile] BloodDrop: ({specialTileX},{specialTileY}), Renk: {tile.bloodDropColor}");
+        Debug.Log($"[Special Tile] BloodDrop: ({specialTileX},{specialTileY}), Z={tile.transform.position.z}");
 
         shouldCreateSpecialTile = false;
     }
-
 
 
 
@@ -1650,5 +1735,843 @@ public class PuzzleManager : MonoBehaviour
 
         boardBusy = false;
         CheckGameState();
+    }
+
+
+
+
+    // ===================== İKİ YARASA BİRLEŞTİRME =====================
+    IEnumerator CombineTwoBats(Tile bat1, Tile bat2)
+    {
+        if (bat1 == null || bat2 == null || !bat1.isBat || !bat2.isBat)
+            yield break;
+
+        if (boardBusy) yield break;
+
+        boardBusy = true;
+
+        Debug.Log($"[Bat Combo] İki Yarasa Birleşiyor: ({bat1.x},{bat1.y}) + ({bat2.x},{bat2.y})");
+
+        // 1. HAMLE SAY
+        totalMoves--;
+        UpdateUI();
+
+        // 2. ANİMASYON - İki yarasa birbirine doğru hareket etsin
+        Vector3 middlePos = (bat1.transform.position + bat2.transform.position) / 2f;
+
+        yield return StartCoroutine(SmoothMove(bat1.transform, middlePos, 0.25f));
+        yield return StartCoroutine(SmoothMove(bat2.transform, middlePos, 0.25f));
+
+        // 3. ÖZEL YARASA BİRLEŞME SESİ
+        if (batSound != null)
+        {
+            AudioSource.PlayClipAtPoint(batSound, Camera.main.transform.position, 1.2f);
+        }
+
+        // 4. BÜYÜK PARTICLE EFEKTİ
+        if (particleEffectManager != null)
+        {
+            particleEffectManager.PlayEffect(TileType.Bat, bat1.transform.position);
+            particleEffectManager.PlayEffect(TileType.Bat, bat2.transform.position);
+
+            // Patlama efekti
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 offset = new Vector3(Random.Range(-0.5f, 0.5f), Random.Range(-0.5f, 0.5f), 0);
+                particleEffectManager.PlayEffect(TileType.BloodDrop, middlePos + offset);
+            }
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        // 5. GRİD'DEN YARASALARI KALDIR
+        grid[bat1.x, bat1.y] = null;
+        grid[bat2.x, bat2.y] = null;
+
+        // 6. YARASALARI YOK ET
+        Destroy(bat1.gameObject);
+        Destroy(bat2.gameObject);
+
+        yield return new WaitForSeconds(0.1f);
+
+        // 7. ORTADA 10 YARASA OLUŞTUR
+        yield return StartCoroutine(CreateTenBatsInCenter(middlePos));
+
+        boardBusy = false;
+        CheckGameState();
+    }
+    // ===================== YARASA ANİMASYON FONKSİYONLARI =====================
+
+    // Yarasa büyüme efekti
+    IEnumerator GrowBat(Transform batTransform, float duration)
+    {
+        float elapsed = 0f;
+        Vector3 startScale = Vector3.zero;
+        Vector3 endScale = Vector3.one * 0.8f; // Biraz küçük
+
+        while (elapsed < duration)
+        {
+            if (batTransform == null) yield break;
+
+            float t = elapsed / duration;
+            // Bounce efekti
+            t = Mathf.Sin(t * Mathf.PI * 0.5f);
+
+            batTransform.localScale = Vector3.Lerp(startScale, endScale, t);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (batTransform != null)
+            batTransform.localScale = endScale;
+    }
+
+    // Yarasa hedefe uçuş animasyonu
+    IEnumerator FlyBatToTarget(Tile bat, Vector3 targetPos, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (bat == null || bat.transform == null) yield break;
+
+        Vector3 startPos = bat.transform.position;
+        float duration = 0.4f;
+        float elapsed = 0f;
+
+        // Uçuş rotasyonu
+        float startRotation = Random.Range(-180f, 180f);
+        float endRotation = startRotation + 360f;
+
+        while (elapsed < duration)
+        {
+            if (bat.transform == null) yield break;
+
+            float t = elapsed / duration;
+            // Hızlanma efekti
+            t = t * t * (3f - 2f * t);
+
+            // Pozisyon
+            bat.transform.position = Vector3.Lerp(startPos, targetPos, t);
+
+            // Rotasyon (dönme efekti)
+            float rotation = Mathf.Lerp(startRotation, endRotation, t);
+            bat.transform.rotation = Quaternion.Euler(0, 0, rotation);
+
+            // Scale (uçarken küçülme)
+            float scale = Mathf.Lerp(0.8f, 0.4f, t);
+            bat.transform.localScale = new Vector3(scale, scale, 1f);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (bat.transform != null)
+        {
+            bat.transform.position = targetPos;
+
+            // Hedefe ulaşınca küçük patlama efekti
+            if (particleEffectManager != null)
+            {
+                particleEffectManager.PlayEffect(TileType.Bat, targetPos);
+            }
+        }
+    }
+
+    // Yarasa küçülme ve yok olma efekti
+    IEnumerator ShrinkAndDestroy(Transform batTransform, float duration)
+    {
+        if (batTransform == null) yield break;
+
+        Vector3 startScale = batTransform.localScale;
+        Vector3 endScale = Vector3.zero;
+        float elapsed = 0f;
+
+        // Renk değişimi (mor -> kırmızı)
+        SpriteRenderer sprite = batTransform.GetComponent<SpriteRenderer>();
+        Color startColor = sprite != null ? sprite.color : Color.white;
+        Color endColor = new Color(1f, 0.3f, 0.3f, 0.5f);
+
+        while (elapsed < duration)
+        {
+            if (batTransform == null) yield break;
+
+            float t = elapsed / duration;
+
+            // Scale küçültme
+            batTransform.localScale = Vector3.Lerp(startScale, endScale, t);
+
+            // Renk değişimi
+            if (sprite != null)
+            {
+                sprite.color = Color.Lerp(startColor, endColor, t);
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (batTransform != null)
+        {
+            Destroy(batTransform.gameObject);
+        }
+    }
+
+    // ===================== PARÇACIK EFENKTİ FONKSİYONU (OPSİYONEL) =====================
+    IEnumerator PlayBatSwarmEffect(Vector3 centerPosition, int batCount)
+    {
+        for (int i = 0; i < batCount; i++)
+        {
+            float angle = Random.Range(0, 360f) * Mathf.Deg2Rad;
+            float distance = Random.Range(0.5f, 2f);
+
+            Vector3 pos = centerPosition + new Vector3(
+                Mathf.Cos(angle) * distance,
+                Mathf.Sin(angle) * distance,
+                0
+            );
+
+            if (particleEffectManager != null)
+            {
+                particleEffectManager.PlayEffect(TileType.Bat, pos);
+            }
+
+            yield return new WaitForSeconds(0.05f);
+        }
+    }
+
+    // ===================== 10 YARASA OLUŞTURMA =====================
+    // ===================== 10 YARASA OLUŞTURMA (ANİMASYONLU) =====================
+    IEnumerator CreateTenBatsInCenter(Vector3 centerPosition)
+    {
+        Debug.Log("[Bat Combo] 10 Yarasa oluşturuluyor...");
+
+        List<Tile> spawnedBats = new List<Tile>();
+        List<Tile> targetsToDestroy = new List<Tile>();
+
+        // 1. ÖNCE HEDEF TILE'LARI BELİRLE
+        // Grid'deki tüm normal tile'ları topla
+        List<Tile> allNormalTiles = new List<Tile>();
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile tile = grid[x, y];
+                if (tile != null &&
+                    !tile.isSpecial &&
+                    !tile.isBloodDrop &&
+                    !tile.isBat &&
+                    !tile.isVampire)
+                {
+                    allNormalTiles.Add(tile);
+                }
+            }
+        }
+
+        // 10 (veya daha az) hedef tile seç
+        int targetCount = Mathf.Min(10, allNormalTiles.Count);
+        List<Tile> selectedTargets = new List<Tile>();
+        List<int> selectedIndices = new List<int>();
+
+        for (int i = 0; i < targetCount; i++)
+        {
+            int randomIndex;
+            do
+            {
+                randomIndex = Random.Range(0, allNormalTiles.Count);
+            } while (selectedIndices.Contains(randomIndex));
+
+            selectedIndices.Add(randomIndex);
+            selectedTargets.Add(allNormalTiles[randomIndex]);
+            targetsToDestroy.Add(allNormalTiles[randomIndex]);
+        }
+
+        Debug.Log($"[Bat Combo] {targetCount} hedef tile seçildi");
+
+        // 2. 10 YARASA OLUŞTUR (DAİRE ŞEKLİNDE)
+        float radius = 1.5f;
+        for (int i = 0; i < 10; i++)
+        {
+            // Daire üzerinde pozisyon hesapla
+            float angle = i * (360f / 10) * Mathf.Deg2Rad;
+            Vector3 spawnPos = centerPosition + new Vector3(
+                Mathf.Cos(angle) * radius,
+                Mathf.Sin(angle) * radius,
+                0
+            );
+
+            GameObject batObj = Instantiate(batPrefab, spawnPos, Quaternion.identity, transform);
+            Tile bat = batObj.GetComponent<Tile>();
+            bat.tileType = TileType.Bat;
+            bat.isSpecial = true;
+            bat.isBat = true;
+            bat.isRandomDestroyer = true;
+
+            spawnedBats.Add(bat);
+
+            // Yarasa görselini küçük başlat (büyüme efekti)
+            bat.transform.localScale = Vector3.zero;
+            StartCoroutine(GrowBat(bat.transform, 0.3f));
+        }
+
+        // Ses efekti - Yarasa sürüsü sesi
+        if (batSound != null)
+        {
+            AudioSource.PlayClipAtPoint(batSound, Camera.main.transform.position, 0.8f);
+        }
+
+        yield return new WaitForSeconds(0.5f);
+
+        // 3. YARASALARI HEDEFLERE UÇUR
+        if (selectedTargets.Count > 0)
+        {
+            Debug.Log($"[Bat Combo] Yarasa sürüsü saldırıyor!");
+
+            List<Coroutine> flyCoroutines = new List<Coroutine>();
+
+            // Her yarasayı bir hedefe yönlendir
+            for (int i = 0; i < Mathf.Min(spawnedBats.Count, selectedTargets.Count); i++)
+            {
+                if (spawnedBats[i] != null && selectedTargets[i] != null)
+                {
+                    Coroutine flyRoutine = StartCoroutine(FlyBatToTarget(
+                        spawnedBats[i],
+                        selectedTargets[i].transform.position,
+                        i * 0.05f // Kademeli başlatma
+                    ));
+                    flyCoroutines.Add(flyRoutine);
+                }
+            }
+
+            // Tüm uçuş animasyonlarının bitmesini bekle
+            foreach (Coroutine routine in flyCoroutines)
+            {
+                yield return routine;
+            }
+
+            yield return new WaitForSeconds(0.2f);
+
+            // 4. HEDEF TILE'LARI PATLAT
+            Debug.Log($"[Bat Combo] Hedef tile'lar patlatılıyor: {targetsToDestroy.Count} adet");
+
+            // Grid'den sil
+            foreach (Tile tile in targetsToDestroy)
+            {
+                if (tile != null)
+                {
+                    grid[tile.x, tile.y] = null;
+                }
+            }
+
+            // PATLAMA SESİ
+            if (matchSound != null)
+            {
+                AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 0.7f);
+            }
+
+            // PATLAMA PARTİKÜLLERİ
+            foreach (Tile tile in targetsToDestroy)
+            {
+                if (tile != null && particleEffectManager != null)
+                {
+                    particleEffectManager.PlayEffect(tile.tileType, tile.transform.position);
+                }
+            }
+
+            yield return new WaitForSeconds(0.15f);
+
+            // HEDEF TILE'LARI YOK ET
+            foreach (Tile tile in targetsToDestroy)
+            {
+                if (tile != null)
+                {
+                    Destroy(tile.gameObject);
+                }
+            }
+
+            // SKOR GÜNCELLE
+            OnMoveResolved(targetsToDestroy.Count);
+        }
+        else
+        {
+            Debug.Log("[Bat Combo] Yok edilecek hedef bulunamadı!");
+        }
+
+        // 5. YARASALARI YOK ET (KÜÇÜLME EFEKTİ)
+        Debug.Log($"[Bat Combo] Yarasa sürüsü dağılıyor...");
+
+        foreach (Tile bat in spawnedBats)
+        {
+            if (bat != null)
+            {
+                // Küçülme efekti
+                StartCoroutine(ShrinkAndDestroy(bat.transform, 0.2f));
+
+                // Partikül efekti
+                if (particleEffectManager != null)
+                {
+                    particleEffectManager.PlayEffect(TileType.Bat, bat.transform.position);
+                }
+            }
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        // 6. DÜŞME VE DOLDURMA
+        yield return StartCoroutine(DropTiles());
+        yield return StartCoroutine(RefillTiles());
+
+        // 7. YENİ MATCH KONTROLÜ
+        List<Tile> newMatches = FindAllMatches();
+        if (newMatches.Count > 0)
+        {
+            yield return StartCoroutine(ResolveBoard());
+        }
+    }
+
+
+
+    // ===================== YARASA + KAN DAMLASI BİRLEŞTİRME =====================
+    IEnumerator CombineBatWithBloodDrop(Tile bat, Tile bloodDrop)
+    {
+        if (bat == null || !bat.isBat || bloodDrop == null || !bloodDrop.isBloodDrop || boardBusy)
+            yield break;
+
+        boardBusy = true;
+
+        Debug.Log($"[Vampirik Dönüşüm] Yarasa ({bat.x},{bat.y}) + Kan Damlası ({bloodDrop.x},{bloodDrop.y})");
+
+        // 1. HAMLE SAY
+        totalMoves--;
+        UpdateUI();
+
+        // 2. ANİMASYON - Yarasa kan damlasına doğru uçsun
+        Vector3 middlePos = (bat.transform.position + bloodDrop.transform.position) / 2f;
+
+        // Yarasa uçuş animasyonu
+        yield return StartCoroutine(FlyToPosition(bat.transform, middlePos, 0.3f, true));
+
+        // Kan damlası titreşim efekti
+        yield return StartCoroutine(PulseEffect(bloodDrop.transform, 0.2f, 1.5f));
+
+        // 3. ÖZEL SES EFEKTİ
+        if (batSound != null)
+        {
+            AudioSource.PlayClipAtPoint(batSound, Camera.main.transform.position, 1f);
+        }
+        if (bloodDropSound != null)
+        {
+            AudioSource.PlayClipAtPoint(bloodDropSound, Camera.main.transform.position, 0.8f);
+        }
+
+        // 4. BÜYÜK PARTİKÜL EFEKTİ (VAMPİR DÖNÜŞÜMÜ)
+        if (particleEffectManager != null)
+        {
+            // Kan efekti
+            particleEffectManager.PlayEffect(TileType.BloodDrop, bloodDrop.transform.position);
+
+            // Yarasa efekti
+            particleEffectManager.PlayEffect(TileType.Bat, bat.transform.position);
+
+            // Vampirik enerji efekti
+            for (int i = 0; i < 5; i++)
+            {
+                Vector3 offset = new Vector3(
+                    Random.Range(-0.8f, 0.8f),
+                    Random.Range(-0.8f, 0.8f),
+                    0
+                );
+                particleEffectManager.PlayEffect(TileType.Vampyr, middlePos + offset);
+            }
+        }
+
+        yield return new WaitForSeconds(0.4f);
+
+        // 5. GRİD'DEN İKİSİNİ DE KALDIR
+        grid[bat.x, bat.y] = null;
+        grid[bloodDrop.x, bloodDrop.y] = null;
+
+        // 6. İKİSİNİ DE YOK ET
+        Destroy(bat.gameObject);
+        Destroy(bloodDrop.gameObject);
+
+        yield return new WaitForSeconds(0.1f);
+
+        // 7. KAN DAMLASININ RENGİNİ AL
+        TileType bloodColor = bloodDrop.bloodDropColor;
+        Debug.Log($"[Vampirik Dönüşüm] Kan rengi: {bloodColor}");
+
+        // 8. RASTGELE 4 TILE'ı KAN DAMLASINA DÖNÜŞTÜR
+        yield return StartCoroutine(TransformRandomTilesToBloodDrops(bloodColor, 4, middlePos));
+
+        boardBusy = false;
+        CheckGameState();
+    }
+
+
+    // ===================== ANİMASYON FONKSİYONLARI =====================
+
+    // Yarasa uçuş animasyonu
+    IEnumerator FlyToPosition(Transform batTransform, Vector3 targetPos, float duration, bool withRotation)
+    {
+        if (batTransform == null) yield break;
+
+        Vector3 startPos = batTransform.position;
+        float elapsed = 0f;
+
+        float startRotation = batTransform.rotation.eulerAngles.z;
+        float endRotation = startRotation + 720f; // 2 tam tur
+
+        while (elapsed < duration)
+        {
+            if (batTransform == null) yield break;
+
+            float t = elapsed / duration;
+            // Yumuşak başlangıç ve bitiş
+            t = t * t * (3f - 2f * t);
+
+            // Pozisyon
+            batTransform.position = Vector3.Lerp(startPos, targetPos, t);
+
+            // Rotasyon (isteğe bağlı)
+            if (withRotation)
+            {
+                float rotation = Mathf.Lerp(startRotation, endRotation, t);
+                batTransform.rotation = Quaternion.Euler(0, 0, rotation);
+            }
+
+            // Scale (uçarken hafif küçülme)
+            float scale = Mathf.Lerp(0.8f, 0.6f, t);
+            batTransform.localScale = new Vector3(scale, scale, 1f);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (batTransform != null)
+            batTransform.position = targetPos;
+    }
+
+    // Titreşim efekti
+    IEnumerator PulseEffect(Transform targetTransform, float duration, float maxScale)
+    {
+        if (targetTransform == null) yield break;
+
+        Vector3 originalScale = targetTransform.localScale;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (targetTransform == null) yield break;
+
+            float t = elapsed / duration;
+            // Sinüs dalgası ile titreşim
+            float pulse = 1f + (Mathf.Sin(t * Mathf.PI * 4f) * (maxScale - 1f));
+
+            targetTransform.localScale = originalScale * pulse;
+
+            // Renk değişimi (kırmızı parlama)
+            SpriteRenderer sr = targetTransform.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                float redValue = 1f + Mathf.Sin(t * Mathf.PI * 2f) * 0.3f;
+                sr.color = new Color(redValue, sr.color.g, sr.color.b, sr.color.a);
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (targetTransform != null)
+            targetTransform.localScale = originalScale;
+    }
+
+
+
+    // ===================== RASTGELE TILE'LARI KAN DAMLASINA DÖNÜŞTÜR =====================
+    IEnumerator TransformRandomTilesToBloodDrops(TileType bloodColor, int count, Vector3 epicenter)
+    {
+        Debug.Log($"[Vampirik Dönüşüm] {count} tile Kan Damlası'na dönüştürülüyor...");
+
+        // 1. TÜM NORMAL TILE'LARI TOPLA
+        List<Tile> allNormalTiles = new List<Tile>();
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile tile = grid[x, y];
+                if (tile != null &&
+                    !tile.isSpecial &&
+                    !tile.isBloodDrop &&
+                    !tile.isBat &&
+                    !tile.isVampire)
+                {
+                    allNormalTiles.Add(tile);
+                }
+            }
+        }
+
+        // 2. RASTGELE TILE'LARI SEÇ (EPİCENTER'A YAKIN OLANLARA ÖNCELİK)
+        List<Tile> tilesToTransform = new List<Tile>();
+
+        if (allNormalTiles.Count > 0)
+        {
+            // Önce epicenter'a yakın olanları sırala
+            allNormalTiles.Sort((a, b) =>
+                Vector3.Distance(a.transform.position, epicenter).CompareTo(
+                Vector3.Distance(b.transform.position, epicenter)));
+
+            // İlk 'count' kadar tile'ı seç (veya daha az)
+            int transformCount = Mathf.Min(count, allNormalTiles.Count);
+            for (int i = 0; i < transformCount; i++)
+            {
+                tilesToTransform.Add(allNormalTiles[i]);
+            }
+        }
+
+        if (tilesToTransform.Count == 0)
+        {
+            Debug.Log("[Vampirik Dönüşüm] Dönüştürülecek tile bulunamadı!");
+            yield break;
+        }
+
+        Debug.Log($"[Vampirik Dönüşüm] {tilesToTransform.Count} tile dönüştürülecek");
+
+        // 3. DÖNÜŞÜM ANİMASYONU
+        List<Coroutine> transformCoroutines = new List<Coroutine>();
+
+        foreach (Tile tile in tilesToTransform)
+        {
+            Coroutine transformRoutine = StartCoroutine(
+                TransformTileToBloodDrop(tile, bloodColor, epicenter)
+            );
+            transformCoroutines.Add(transformRoutine);
+
+            // Kademeli başlat
+            yield return new WaitForSeconds(0.1f);
+        }
+
+        // Tüm dönüşümler bitene kadar bekle
+        foreach (Coroutine routine in transformCoroutines)
+        {
+            yield return routine;
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        // 4. YENİ MATCH KONTROLÜ
+        List<Tile> newMatches = FindAllMatches();
+        if (newMatches.Count > 0)
+        {
+            yield return StartCoroutine(ResolveBoard());
+        }
+    }
+
+    // ===================== TİLE'DAN KAN DAMLASINA DÖNÜŞÜM =====================
+    // ===================== TİLE'DAN KAN DAMLASINA DÖNÜŞÜM =====================
+    IEnumerator TransformTileToBloodDrop(Tile originalTile, TileType bloodColor, Vector3 epicenter)
+    {
+        if (originalTile == null) yield break;
+
+        int x = originalTile.x;
+        int y = originalTile.y;
+        Vector3 tilePos = originalTile.transform.position;
+
+        // 1. ÖNCE MEVCUT TİLE'IN ÜZERİNDE EFEKT
+        if (particleEffectManager != null)
+        {
+            particleEffectManager.PlayEffect(originalTile.tileType, tilePos);
+        }
+
+        // 2. TİLE'ı YOK ET
+        grid[x, y] = null;
+        Destroy(originalTile.gameObject);
+
+        yield return new WaitForSeconds(0.1f);
+
+        // 3. KAN DALGASI ANİMASYONU
+        yield return StartCoroutine(PlayBloodWaveEffect(epicenter, tilePos, 0.3f));
+
+        // 4. YENİ KAN DAMLASI OLUŞTUR (ÖNDE!)
+        Vector3 bloodDropPos = new Vector3(tilePos.x, tilePos.y, -1f); // Z = -1 (ön plan)
+        Tile bloodDrop = CreateBloodDropAtPosition(x, y, bloodColor, bloodDropPos);
+
+        // 5. KISA BÜYÜME ANİMASYONU
+        float growDuration = 0.3f;
+        float elapsed = 0f;
+        Vector3 startScale = new Vector3(0.1f, 0.1f, 1f);
+        Vector3 endScale = new Vector3(0.5f, 0.5f, 1f);
+
+        bloodDrop.transform.localScale = startScale;
+
+        while (elapsed < growDuration)
+        {
+            if (bloodDrop == null) yield break;
+
+            float t = elapsed / growDuration;
+            t = Mathf.Sin(t * Mathf.PI * 0.5f);
+
+            bloodDrop.transform.localScale = Vector3.Lerp(startScale, endScale, t);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (bloodDrop != null)
+            bloodDrop.transform.localScale = endScale;
+
+        // 6. Grid'e yerleştir
+        grid[x, y] = bloodDrop;
+
+        // 7. SES EFEKTİ
+        if (bloodDropSound != null)
+        {
+            AudioSource.PlayClipAtPoint(bloodDropSound, Camera.main.transform.position, 0.4f);
+        }
+    }
+
+    // Elastic out easing fonksiyonu
+    float ElasticOut(float t)
+    {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+
+        float p = 0.3f;
+        return Mathf.Pow(2, -10 * t) * Mathf.Sin((t - p / 4) * (2 * Mathf.PI) / p) + 1;
+    }
+
+    // Bitirme titreşim efekti
+    IEnumerator FinishPulse(Transform targetTransform, Vector3 normalScale, float duration)
+    {
+        if (targetTransform == null) yield break;
+
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (targetTransform == null) yield break;
+
+            float t = elapsed / duration;
+            float pulse = 1f + Mathf.Sin(t * Mathf.PI * 4f) * 0.05f; // Çok hafif titreşim
+
+            targetTransform.localScale = normalScale * pulse;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (targetTransform != null)
+            targetTransform.localScale = normalScale;
+    }
+
+
+
+    // ===================== KAN DALGASI EFEKTİ =====================
+    IEnumerator PlayBloodWaveEffect(Vector3 fromPos, Vector3 toPos, float duration)
+    {
+        // Bu efekt için bir GameObject veya partikül sistemi kullanabilirsiniz
+        // Basit versiyon:
+        if (particleEffectManager != null)
+        {
+            // Aradaki noktalarda partikül oluştur
+            int steps = 10;
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = (float)i / steps;
+                Vector3 pos = Vector3.Lerp(fromPos, toPos, t);
+                particleEffectManager.PlayEffect(TileType.BloodDrop, pos);
+                yield return new WaitForSeconds(duration / steps);
+            }
+        }
+    }
+
+    // ===================== KAN DAMLASI OLUŞTURMA (SABİT 0.5 BOYUT) =====================
+    // ===================== KAN DAMLASI OLUŞTURMA (SABİT 0.5 BOYUT) =====================
+    Tile CreateBloodDropAtPosition(int x, int y, TileType bloodColor, Vector3 position)
+    {
+        GameObject bloodDropObj = Instantiate(bloodDropPrefab, position, Quaternion.identity, transform);
+        Tile bloodDrop = bloodDropObj.GetComponent<Tile>();
+
+        bloodDrop.x = x;
+        bloodDrop.y = y;
+        bloodDrop.tileType = TileType.BloodDrop;
+        bloodDrop.isSpecial = true;
+        bloodDrop.isBloodDrop = true;
+        bloodDrop.isVampire = false;
+        bloodDrop.isBat = false;
+        bloodDrop.bloodDropColor = bloodColor;
+
+        // BOYUTU 0.5 YAP
+        bloodDrop.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
+
+        // SADECE BU SATIRI EKLEYİN:
+        bloodDrop.transform.position = new Vector3(position.x, position.y, -100f); // ÇOK ÖNDE!
+
+        // Görseli güncelle
+        bloodDrop.UpdateBloodDropVisual();
+
+        return bloodDrop;
+    }
+    IEnumerator HandleMatchesWithoutSpecialTiles(List<Tile> matches)
+    {
+        if (matches == null || matches.Count == 0)
+            yield break;
+
+        List<Tile> filteredMatches = new List<Tile>();
+        foreach (Tile tile in matches)
+        {
+            if (tile != null &&
+                !tile.isSpecial &&
+                !tile.isBloodDrop &&
+                !tile.isBat &&
+                !tile.isVampire)
+            {
+                filteredMatches.Add(tile);
+            }
+        }
+
+        if (filteredMatches.Count == 0)
+            yield break;
+
+        // SES VE EFEKTLER
+        if (matchSound != null)
+        {
+            AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position);
+        }
+
+        foreach (Tile tile in filteredMatches)
+        {
+            if (tile != null && particleEffectManager != null)
+            {
+                particleEffectManager.PlayEffect(tile.tileType, tile.transform.position);
+            }
+        }
+
+        yield return new WaitForSeconds(0.15f);
+
+        // GRİD'DEN SİL VE YOK ET
+        foreach (Tile tile in filteredMatches)
+        {
+            if (tile != null)
+            {
+                grid[tile.x, tile.y] = null;
+                Destroy(tile.gameObject);
+            }
+        }
+
+        // SKOR GÜNCELLE
+        OnMoveResolved(filteredMatches.Count);
+    }
+    IEnumerator CreateAllSpecialTiles()
+    {
+        // ÖNCE KAN DAMLALARI
+        if (shouldCreateSpecialTile)
+        {
+            yield return StartCoroutine(CreateSpecialTileAfterDelay());
+        }
+
+        // SONRA YARASALAR
+        if (shouldCreateBat)
+        {
+            yield return StartCoroutine(CreateBatAfterDelay());
+        }
     }
 }
