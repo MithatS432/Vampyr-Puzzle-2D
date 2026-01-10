@@ -22,6 +22,7 @@ public class PuzzleManager : MonoBehaviour
     public GameObject bluePrefab;
     public GameObject bloodDropPrefab;
     public GameObject batPrefab;
+    public GameObject vampirePrefab;
 
     Tile[,] grid;
 
@@ -86,6 +87,10 @@ public class PuzzleManager : MonoBehaviour
     private bool shouldCreateBat = false;
     private int batTileX, batTileY;
 
+    private bool shouldCreateVampire = false;
+    private int vampireX = 0;
+    private int vampireY = 0;
+
     [Header("Performance")]
     public bool enableFastAnimations = true;
     public float fastDropDuration = 0.1f;
@@ -98,7 +103,7 @@ public class PuzzleManager : MonoBehaviour
 
     void Start()
     {
-        targetCount = Random.Range(100, 201);
+        targetCount = Random.Range(150, 251);
         totalMoves = 15;
 
         currentBlood = 0.1f;
@@ -213,7 +218,36 @@ public class PuzzleManager : MonoBehaviour
 
                 if (targetTile != null)
                 {
-                    Debug.Log($"[DragDebug] sel=({selectedTile.x},{selectedTile.y}) isBat:{selectedTile.isBat} isBlood:{selectedTile.isBloodDrop} isSpecial:{selectedTile.isSpecial} | tgt=({targetTile.x},{targetTile.y}) isBat:{targetTile.isBat} isBlood:{targetTile.isBloodDrop} isSpecial:{targetTile.isSpecial} type:{targetTile.tileType}");
+                    if (selectedTile.isVampire && targetTile.isVampire)
+                    {
+                        StartCoroutine(CombineTwoVampires(selectedTile, targetTile));
+                    }
+
+
+                    if (selectedTile.isVampire && targetTile.isBloodDrop)
+                    {
+                        StartCoroutine(ActivateVampireWithBloodDrop(selectedTile, targetTile));
+                    }
+                    else if (selectedTile.isBloodDrop && targetTile.isVampire)
+                    {
+                        StartCoroutine(ActivateVampireWithBloodDrop(targetTile, selectedTile));
+                    }
+                    else if (selectedTile.isVampire && targetTile.isBat)
+                    {
+                        StartCoroutine(CombineVampireWithBat(selectedTile, targetTile));
+                    }
+                    else if (selectedTile.isBat && targetTile.isVampire)
+                    {
+                        StartCoroutine(CombineVampireWithBat(targetTile, selectedTile));
+                    }
+                    else if (selectedTile.isVampire && !targetTile.isSpecial)
+                    {
+                        StartCoroutine(ActivateVampireWithNormalTile(selectedTile, targetTile));
+                    }
+                    else if (targetTile.isVampire && !selectedTile.isSpecial)
+                    {
+                        StartCoroutine(ActivateVampireWithNormalTile(targetTile, selectedTile));
+                    }
 
                     // 1) BloodDrop + BloodDrop
                     if (selectedTile.isBloodDrop && targetTile.isBloodDrop)
@@ -403,7 +437,6 @@ public class PuzzleManager : MonoBehaviour
 
         boardBusy = true;
 
-        Debug.Log($"[Bat Combo] Başlatılıyor: ({bat1.x},{bat1.y}) + ({bat2.x},{bat2.y})");
 
         // Hamle sayısı
         totalMoves--;
@@ -470,7 +503,7 @@ public class PuzzleManager : MonoBehaviour
 
             // Hedef pozisyon ve süre
             Vector3 targetPos = target.transform.position;
-            float duration = 0.25f + Random.Range(0f, 0.18f);
+            float duration = 0.45f + Random.Range(0.15f, 0.35f);
 
             // Küçük gecikme ile stagger
             yield return new WaitForSeconds(0.03f);
@@ -772,6 +805,17 @@ public class PuzzleManager : MonoBehaviour
     }
     IEnumerator TrySwapSafe(Tile a, Tile b)
     {
+        // 🔒 KRİTİK KORUMA
+        if (a == null || b == null)
+            yield break;
+
+        // Destroy edilmiş objeler için Unity özel null kontrolü
+        if (!a || !b)
+            yield break;
+
+        if (boardBusy)
+            yield break;
+
         if (gameEnded || isResolvingBoard)
             yield break;
 
@@ -829,28 +873,23 @@ public class PuzzleManager : MonoBehaviour
         CheckGameState();
     }
 
-    IEnumerator SmoothMove(Transform obj, Vector3 targetPos, float duration)
+    IEnumerator SmoothMove(Transform obj, Vector3 target, float duration)
     {
-        if (obj == null) yield break;
-
-        Vector3 startPos = obj.position;
+        Vector3 start = obj.position;
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
-            if (obj == null) yield break;
-
-            float t = elapsed / duration;
-            // Smooth step için (daha yumuşak hareket)
-            t = t * t * (3f - 2f * t);
-
-            obj.position = Vector3.Lerp(startPos, targetPos, t);
             elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+
+            float smoothT = 1f - Mathf.Pow(1f - t, 3f);
+
+            obj.position = Vector3.Lerp(start, target, smoothT);
             yield return null;
         }
 
-        if (obj != null)
-            obj.position = targetPos;
+        obj.position = target;
     }
 
     IEnumerator ResolveBoard()
@@ -861,8 +900,6 @@ public class PuzzleManager : MonoBehaviour
 
         while (matches.Count > 0)
         {
-            Debug.Log($"[ResolveBoard] {matches.Count} eşleşme bulundu");
-
             // 1. EŞLEŞMELERİ PATLAT
             yield return StartCoroutine(HandleMatches(matches));
 
@@ -871,6 +908,10 @@ public class PuzzleManager : MonoBehaviour
 
             // 3. YENİ TILE'LAR EKLE
             yield return StartCoroutine(RefillTiles());
+
+            if (shouldCreateVampire)
+                yield return StartCoroutine(CreateVampireAfterDelay());
+
 
             // 4. YENİDEN KONTROL ET
             matches = FindAllMatches();
@@ -1178,6 +1219,109 @@ public class PuzzleManager : MonoBehaviour
             yield return StartCoroutine(CreateBatAfterDelay());
     }
 
+    IEnumerator CreateVampireAfterDelay()
+    {
+        // küçük gecikme varsa bırakın; yoksa doğrudan devam edebiliriz
+        yield return new WaitForSeconds(0.12f);
+
+        if (!shouldCreateVampire)
+            yield break;
+
+        // bounds kontrolü
+        if (vampireX < 0 || vampireX >= width || vampireY < 0 || vampireY >= height)
+        {
+            shouldCreateVampire = false;
+            yield break;
+        }
+
+        // hedef pozisyonu değişkene al
+        int tx = vampireX;
+        int ty = vampireY;
+
+        // Eğer hedef hücre boş ise doğrudan oluştur
+        if (grid[tx, ty] == null)
+        {
+            InstantiateVampireAt(tx, ty);
+            shouldCreateVampire = false;
+            yield break;
+        }
+
+        // Eğer dolu ama dolu olan normal bir tile ise onu kaldırıp vampiri oluştur
+        Tile existing = grid[tx, ty];
+        if (existing != null && !existing.isSpecial)
+        {
+            grid[tx, ty] = null;
+            Destroy(existing.gameObject);
+            yield return new WaitForSeconds(0.05f); // küçük bekleme his vermek için
+            InstantiateVampireAt(tx, ty);
+            shouldCreateVampire = false;
+            yield break;
+        }
+
+        // Eğer dolu ve özelse, yakın bir boş hücre yeğle (manhattan radius 1..2)
+        bool placed = false;
+        for (int r = 1; r <= 2 && !placed; r++)
+        {
+            for (int ox = -r; ox <= r; ox++)
+            {
+                for (int oy = -r; oy <= r; oy++)
+                {
+                    if (Mathf.Abs(ox) + Mathf.Abs(oy) > r) continue; // manhattan sınırlı
+                    int nx = tx + ox;
+                    int ny = ty + oy;
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                    if (grid[nx, ny] == null)
+                    {
+                        InstantiateVampireAt(nx, ny);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (placed) break;
+            }
+        }
+        shouldCreateVampire = false;
+    }
+
+
+    void InstantiateVampireAt(int x, int y)
+    {
+        Vector3 pos = GetTileWorldPosition(x, y);
+        GameObject prefab = vampirePrefab != null ? vampirePrefab : redPrefab;
+        GameObject obj = Instantiate(prefab, pos, Quaternion.identity, transform);
+
+        Tile tile = obj.GetComponent<Tile>();
+        if (tile == null)
+        {
+            Debug.LogWarning("[Vampire] Oluşturulan prefab Tile component içermiyor!");
+            Destroy(obj);
+            return;
+        }
+
+        tile.x = x;
+        tile.y = y;
+
+        // Vampir için benzersiz davranış: isSpecial=true yapıyoruz
+        tile.isSpecial = true;
+        tile.isVampire = true;
+        tile.isBat = false;
+        tile.isBloodDrop = false;
+
+        // Eğer Tile.UpdateVisual() isVampire'ı magenta yapıyorsa yeterli; yoksa tile.tileType ayarlayın
+        tile.UpdateVisual();
+
+        // grid'e yerleştir
+        grid[x, y] = tile;
+
+        if (particleEffectManager != null)
+            particleEffectManager.PlayEffect(TileType.Vampyr, pos);
+
+        if (matchSound != null)
+            AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 0.6f);
+
+        Debug.Log($"[Vampire] Oluşturuldu: ({x},{y})");
+    }
+
     IEnumerator DropTiles()
     {
         List<Coroutine> dropCoroutines = new List<Coroutine>();
@@ -1456,6 +1600,8 @@ public class PuzzleManager : MonoBehaviour
 
         // Kare eşleşmeler (2x2)
         CheckSquares(result);
+        CheckTAndLShapes(result);
+
 
         return new List<Tile>(result);
     }
@@ -1570,6 +1716,8 @@ public class PuzzleManager : MonoBehaviour
     {
         Tile startTile = grid[startX, startY];
         if (startTile == null) return;
+        if (startTile.isSpecial) return;
+
 
         List<Tile> match = new List<Tile> { startTile };
 
@@ -1629,9 +1777,10 @@ public class PuzzleManager : MonoBehaviour
                 Tile d = grid[x + 1, y + 1];
 
                 if (a != null && b != null && c != null && d != null &&
-                    a.tileType == b.tileType &&
-                    a.tileType == c.tileType &&
-                    a.tileType == d.tileType)
+     !a.isSpecial && !b.isSpecial && !c.isSpecial && !d.isSpecial &&
+     a.tileType == b.tileType &&
+     a.tileType == c.tileType &&
+     a.tileType == d.tileType)
                 {
                     result.Add(a);
                     result.Add(b);
@@ -1943,4 +2092,642 @@ public class PuzzleManager : MonoBehaviour
         boardBusy = false;
         CheckGameState();
     }
+
+
+
+
+    void CheckTAndLShapes(HashSet<Tile> result)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile center = grid[x, y];
+                if (center == null) continue;
+
+                TileType color = center.tileType;
+
+                // --- T / + detection (center intersection) ---
+                int left = CountRunFrom(x - 1, y, -1, 0, color);
+                int right = CountRunFrom(x + 1, y, 1, 0, color);
+                int horizLen = left + 1 + right;
+
+                int down = CountRunFrom(x, y - 1, 0, -1, color);
+                int up = CountRunFrom(x, y + 1, 0, 1, color);
+                int vertLen = down + 1 + up;
+
+                if (horizLen >= 3 && vertLen >= 3)
+                {
+                    // horizontal
+                    for (int hx = x - left; hx <= x + right; hx++)
+                    {
+                        Tile t = grid[hx, y];
+                        if (t != null) result.Add(t);
+                    }
+                    // vertical
+                    for (int vy = y - down; vy <= y + up; vy++)
+                    {
+                        Tile t = grid[x, vy];
+                        if (t != null) result.Add(t);
+                    }
+
+                    CreateVampireAfterMatch(x, y);
+                    continue;
+                }
+
+                // --- L-shape detection (corner based) ---
+                // up + right (corner at x,y)
+                int vertUpFromCorner = CountRunFrom(x, y, 0, 1, color);
+                int horizRightFromCorner = CountRunFrom(x, y, 1, 0, color);
+                if (vertUpFromCorner >= 3 && horizRightFromCorner >= 3)
+                {
+                    for (int vy = y; vy <= y + vertUpFromCorner - 1; vy++)
+                        if (grid[x, vy] != null) result.Add(grid[x, vy]);
+                    for (int hx = x; hx <= x + horizRightFromCorner - 1; hx++)
+                        if (grid[hx, y] != null) result.Add(grid[hx, y]);
+
+                    CreateVampireAfterMatch(x, y);
+                    continue;
+                }
+
+                // up + left
+                int vertUpFromCorner2 = CountRunFrom(x, y, 0, 1, color);
+                int horizLeftFromCorner = CountRunFrom(x, y, -1, 0, color);
+                if (vertUpFromCorner2 >= 3 && horizLeftFromCorner >= 3)
+                {
+                    for (int vy = y; vy <= y + vertUpFromCorner2 - 1; vy++)
+                        if (grid[x, vy] != null) result.Add(grid[x, vy]);
+                    for (int hx = x; hx >= x - (horizLeftFromCorner - 1); hx--)
+                        if (grid[hx, y] != null) result.Add(grid[hx, y]);
+
+                    CreateVampireAfterMatch(x, y);
+                    continue;
+                }
+
+                // down + right
+                int vertDownFromCorner = CountRunFrom(x, y, 0, -1, color);
+                int horizRightFromCorner2 = CountRunFrom(x, y, 1, 0, color);
+                if (vertDownFromCorner >= 3 && horizRightFromCorner2 >= 3)
+                {
+                    for (int vy = y; vy >= y - (vertDownFromCorner - 1); vy--)
+                        if (grid[x, vy] != null) result.Add(grid[x, vy]);
+                    for (int hx = x; hx <= x + horizRightFromCorner2 - 1; hx++)
+                        if (grid[hx, y] != null) result.Add(grid[hx, y]);
+
+                    CreateVampireAfterMatch(x, y);
+                    continue;
+                }
+
+                // down + left
+                int vertDownFromCorner2 = CountRunFrom(x, y, 0, -1, color);
+                int horizLeftFromCorner2 = CountRunFrom(x, y, -1, 0, color);
+                if (vertDownFromCorner2 >= 3 && horizLeftFromCorner2 >= 3)
+                {
+                    for (int vy = y; vy >= y - (vertDownFromCorner2 - 1); vy--)
+                        if (grid[x, vy] != null) result.Add(grid[x, vy]);
+                    for (int hx = x; hx >= x - (horizLeftFromCorner2 - 1); hx--)
+                        if (grid[hx, y] != null) result.Add(grid[hx, y]);
+
+                    CreateVampireAfterMatch(x, y);
+                    continue;
+                }
+            }
+        }
+    }
+
+
+    void CreateVampireAfterMatch(int x, int y)
+    {
+        shouldCreateVampire = true;
+        vampireX = x;
+        vampireY = y;
+        Debug.Log($"[Vampire] İşaretlendi: ({x},{y})");
+    }
+    private int CountRunFrom(int sx, int sy, int dx, int dy, TileType color)
+    {
+        int cnt = 0;
+        int cx = sx, cy = sy;
+        while (cx >= 0 && cx < width && cy >= 0 && cy < height)
+        {
+            Tile t = grid[cx, cy];
+            if (t != null && t.tileType == color) { cnt++; cx += dx; cy += dy; }
+            else break;
+        }
+        return cnt;
+    }
+
+
+    IEnumerator ActivateVampireWithBloodDrop(Tile vampire, Tile bloodDrop)
+    {
+        if (vampire == null || bloodDrop == null) yield break;
+        if (!vampire.isVampire || !bloodDrop.isBloodDrop) yield break;
+        if (boardBusy) yield break;
+
+        boardBusy = true;
+
+        Debug.Log($"[Vampire+BloodDrop] Başlatılıyor: Vampir ({vampire.x},{vampire.y}) + KanDamla ({bloodDrop.x},{bloodDrop.y})");
+
+        // 1) Hamle azalt (isteğe göre)
+        totalMoves--;
+        UpdateUI();
+
+        // 2) Ses/efekt (isteğe bağlı)
+        if (matchSound != null)
+            AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 0.8f);
+
+        if (particleEffectManager != null)
+            particleEffectManager.PlayEffect(TileType.Vampyr, vampire.transform.position);
+
+        // 3) Grid'den vampir ve kan damlasını kaldır (önce grid, sonra yok et)
+        int vx = vampire.x, vy = vampire.y;
+        int bx = bloodDrop.x, by = bloodDrop.y;
+
+        if (vx >= 0 && vx < width && vy >= 0 && vy < height)
+            grid[vx, vy] = null;
+        if (bx >= 0 && bx < width && by >= 0 && by < height)
+            grid[bx, by] = null;
+
+        Destroy(vampire.gameObject);
+        Destroy(bloodDrop.gameObject);
+
+        // Kısa bekleme animasyon hissi için
+        yield return new WaitForSeconds(0.08f);
+
+        // 4) 3x3 alanı hesapla (kan damlası merkezli)
+        int startX = Mathf.Max(0, bx - 1);
+        int endX = Mathf.Min(width - 1, bx + 1);
+        int startY = Mathf.Max(0, by - 1);
+        int endY = Mathf.Min(height - 1, by + 1);
+
+        // 5) Yok edilecek tile'ları topla
+        List<Tile> tilesToDestroy = new List<Tile>();
+        for (int x = startX; x <= endX; x++)
+        {
+            for (int y = startY; y <= endY; y++)
+            {
+                Tile t = grid[x, y];
+                if (t != null)
+                {
+                    tilesToDestroy.Add(t);
+                }
+            }
+        }
+
+        Debug.Log($"[Vampire+BloodDrop] 3x3 içinde {tilesToDestroy.Count} tile yok edilecek.");
+
+        // 6) Grid'den kaldır ve efekt çal
+        if (tilesToDestroy.Count > 0)
+        {
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t == null) continue;
+                grid[t.x, t.y] = null;
+            }
+
+            // Ses / partikül
+            if (matchSound != null)
+                AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 0.7f);
+
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t != null && particleEffectManager != null)
+                    particleEffectManager.PlayEffect(t.tileType, t.transform.position);
+            }
+
+            yield return new WaitForSeconds(0.12f);
+
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t != null)
+                    Destroy(t.gameObject);
+            }
+        }
+
+        // 7) Skor / hedef güncelle (yok edilen sayıya göre)
+        int destroyedCount = tilesToDestroy.Count;
+        if (destroyedCount == 0)
+            destroyedCount = 1; // en az 1 olarak saymak isterseniz
+        OnMoveResolved(destroyedCount);
+
+        // 8) Drop ve refill
+        yield return StartCoroutine(DropTiles());
+        yield return StartCoroutine(RefillTiles());
+
+        // 9) Yeni match kontrolü
+        List<Tile> newMatches = FindAllMatches();
+        if (newMatches.Count > 0)
+            yield return StartCoroutine(ResolveBoard());
+
+        boardBusy = false;
+        CheckGameState();
+    }
+
+
+
+    IEnumerator CombineVampireWithBat(Tile vampire, Tile bat)
+    {
+        if (vampire == null || bat == null) yield break;
+        if (!vampire.isVampire || !bat.isBat) yield break;
+        if (boardBusy) yield break;
+
+        boardBusy = true;
+
+        // 1) Hamle azalt (isteğe göre)
+        totalMoves--;
+        UpdateUI();
+
+        // 2) Ses & başlangıç efektleri
+        if (batSound != null)
+            AudioSource.PlayClipAtPoint(batSound, Camera.main.transform.position, 0.9f);
+        if (particleEffectManager != null)
+            particleEffectManager.PlayEffect(TileType.Bat, vampire.transform.position);
+
+        // 3) Vampire ve yarasayı grid'den kaldır (önce grid, sonra Destroy)
+        int vx = vampire.x, vy = vampire.y;
+        int bx = bat.x, by = bat.y;
+
+        if (vx >= 0 && vx < width && vy >= 0 && vy < height) grid[vx, vy] = null;
+        if (bx >= 0 && bx < width && by >= 0 && by < height) grid[bx, by] = null;
+
+        Destroy(vampire.gameObject);
+        Destroy(bat.gameObject);
+
+        yield return new WaitForSeconds(0.08f);
+
+        // 4) Hedef adaylarını topla (normal tile'lar: special/blooddrop/bat olmayanlar)
+        List<Tile> candidates = new List<Tile>();
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile t = grid[x, y];
+                if (t != null && !t.isSpecial && !t.isBloodDrop && !t.isBat)
+                    candidates.Add(t);
+            }
+        }
+
+        // Karıştır (Fisher-Yates)
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int j = Random.Range(i, candidates.Count);
+            Tile tmp = candidates[i];
+            candidates[i] = candidates[j];
+            candidates[j] = tmp;
+        }
+
+        int spawnCount = Mathf.Min(20, candidates.Count);
+        Vector3 centerPos = ((vampire != null) ? vampire.transform.position : GetTileWorldPosition(bx, by)); // vampire destroyed - fallback center
+
+        List<Coroutine> moveRoutines = new List<Coroutine>();
+        int destroyedCount = 0;
+
+        // 5) Spawn ve gönder (stagger ile)
+        for (int i = 0; i < spawnCount; i++)
+        {
+            Tile target = candidates[i];
+            if (target == null) continue;
+
+            // Proje görseli: batPrefab kullanıyoruz (aynı görsel)
+            GameObject proj = Instantiate(batPrefab, centerPos, Quaternion.identity, transform);
+
+            // Eğer prefab içinde Tile component varsa, etkileşimi kapat
+            Tile projTile = proj.GetComponent<Tile>();
+            if (projTile != null)
+            {
+                projTile.isBat = false;
+                projTile.isSpecial = false;
+                projTile.isBloodDrop = false;
+            }
+
+            Vector3 targetPos = target.transform.position;
+            float duration = 0.45f + Random.Range(0.15f, 0.35f);
+
+            // küçük stagger
+            yield return new WaitForSeconds(0.02f);
+
+            Coroutine c = StartCoroutine(MoveProjectileAndDestroyTargetVamp(proj, target, targetPos, duration, () => { destroyedCount++; }));
+            moveRoutines.Add(c);
+        }
+
+        // 6) Büyük efekt ortada (opsiyonel)
+        if (particleEffectManager != null)
+            particleEffectManager.PlayEffect(TileType.Vampyr, centerPos);
+
+        // 7) Tüm projelerin bitmesini bekle
+        foreach (Coroutine r in moveRoutines)
+            yield return r;
+
+        // 8) Skor / hedef güncellemesi
+        if (destroyedCount > 0)
+        {
+            OnMoveResolved(destroyedCount);
+        }
+        else
+        {
+            // Hiç yok edilmediyse yine en az 1 hamle sayısı tüketilmişti; isteğe bağlı:
+            OnMoveResolved(1);
+        }
+
+        // 9) Drop & refill & resolve
+        yield return StartCoroutine(DropTiles());
+        yield return StartCoroutine(RefillTiles());
+
+        List<Tile> newMatches = FindAllMatches();
+        if (newMatches.Count > 0)
+            yield return StartCoroutine(ResolveBoard());
+
+        boardBusy = false;
+        CheckGameState();
+    }
+
+
+
+    IEnumerator MoveProjectileAndDestroyTargetVamp(GameObject proj, Tile target, Vector3 targetPos, float duration, System.Action onArrive)
+    {
+        if (proj == null) yield break;
+
+        // Hareket
+        yield return StartCoroutine(SmoothMove(proj.transform, targetPos, duration));
+
+        // Hedef var ise yok et
+        if (target != null)
+        {
+            int tx = target.x;
+            int ty = target.y;
+
+            if (tx >= 0 && tx < width && ty >= 0 && ty < height && grid[tx, ty] == target)
+                grid[tx, ty] = null;
+
+            // Ses & efekt
+            if (matchSound != null)
+                AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 0.7f);
+
+            if (particleEffectManager != null)
+                particleEffectManager.PlayEffect(target.tileType, targetPos);
+
+            Destroy(target.gameObject);
+            onArrive?.Invoke();
+        }
+
+        Destroy(proj);
+        yield return null;
+    }
+
+
+    IEnumerator CombineTwoVampires(Tile vamp1, Tile vamp2)
+    {
+        if (vamp1 == null || vamp2 == null) yield break;
+        if (!vamp1.isVampire || !vamp2.isVampire) yield break;
+        if (boardBusy) yield break;
+
+        boardBusy = true;
+
+        Debug.Log($"[Vampire Combo] Başlatılıyor: Vampir1 ({vamp1.x},{vamp1.y}) + Vampir2 ({vamp2.x},{vamp2.y})");
+
+        // 1) Hamle azalt
+        totalMoves--;
+        UpdateUI();
+
+        // 2) Başlangıç ses/efekt
+        if (matchSound != null)
+            AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 1f);
+        if (particleEffectManager != null)
+        {
+            // Ortada efekt oynatmak için ortalama pozisyon
+            Vector3 centerPos = (vamp1.transform.position + vamp2.transform.position) * 0.5f;
+            particleEffectManager.PlayEffect(TileType.Vampyr, centerPos);
+        }
+
+        // 3) Önce grid'den vampirleri kaldır
+        int v1x = vamp1.x, v1y = vamp1.y;
+        int v2x = vamp2.x, v2y = vamp2.y;
+
+        if (v1x >= 0 && v1x < width && v1y >= 0 && v1y < height) grid[v1x, v1y] = null;
+        if (v2x >= 0 && v2x < width && v2y >= 0 && v2y < height) grid[v2x, v2y] = null;
+
+        // 4) Destroy vampir GameObject'leri
+        Destroy(vamp1.gameObject);
+        Destroy(vamp2.gameObject);
+
+        // Küçük bekleme efekt hissi
+        yield return new WaitForSeconds(0.08f);
+
+        // 5) Tüm grid'i tarayıp yok edilecek tile'ları topla
+        List<Tile> tilesToDestroy = new List<Tile>();
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile t = grid[x, y];
+                if (t != null)
+                {
+                    // Eğer special'ları KORUMAK isterseniz buraya !t.isSpecial koşulu ekleyin.
+                    tilesToDestroy.Add(t);
+                }
+            }
+        }
+
+        int destroyedCount = tilesToDestroy.Count;
+        Debug.Log($"[Vampire Combo] Tüm grid temizleniyor. Yok edilecek tile sayısı: {destroyedCount}");
+
+        // 6) Grid'den kaldır ve efektleri tetikle
+        if (tilesToDestroy.Count > 0)
+        {
+            // Grid'den null'la
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t != null)
+                    grid[t.x, t.y] = null;
+            }
+
+            // Tek seferde ses çal (zorluk olmaması için)
+            if (matchSound != null)
+                AudioSource.PlayClipAtPoint(matchSound, Camera.main.transform.position, 1f);
+
+            // Her hedef için partikül (isteğe göre tümüne uygulansın)
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t != null && particleEffectManager != null)
+                    particleEffectManager.PlayEffect(t.tileType, t.transform.position);
+            }
+
+            // Kısa bekleme, efektlerin görünmesi için
+            yield return new WaitForSeconds(0.15f);
+
+            // Destroy gameObjects
+            foreach (Tile t in tilesToDestroy)
+            {
+                if (t != null)
+                    Destroy(t.gameObject);
+            }
+        }
+
+        // 7) Skor/target güncellemesi
+        if (destroyedCount > 0)
+        {
+            OnMoveResolved(destroyedCount);
+        }
+        else
+        {
+            // Hiç yok edilmediyse yine 1 işlem sayısı azaldıysa OnMoveResolved(1) çağrılabilir
+            OnMoveResolved(1);
+        }
+
+        // 8) Drop & refill
+        yield return StartCoroutine(DropTiles());
+        yield return StartCoroutine(RefillTiles());
+
+        // 9) Yeni match kontrolü ve çözüm
+        List<Tile> newMatches = FindAllMatches();
+        if (newMatches.Count > 0)
+            yield return StartCoroutine(ResolveBoard());
+
+        boardBusy = false;
+        CheckGameState();
+
+        Debug.Log("[Vampire Combo] Tamamlandı");
+    }
+
+
+
+    IEnumerator ActivateVampireWithNormalTile(Tile vampire, Tile normalTile)
+    {
+        if (boardBusy) yield break;
+        if (vampire == null || normalTile == null) yield break;
+        if (!vampire.isVampire || normalTile.isSpecial) yield break;
+
+        boardBusy = true;
+
+        // 1️⃣ Grid’den kaldır
+        grid[vampire.x, vampire.y] = null;
+        grid[normalTile.x, normalTile.y] = null;
+
+        Vector3 vPos = vampire.transform.position;
+        Vector3 nPos = normalTile.transform.position;
+
+        // 2️⃣ Yarasa çıkış noktası
+        Vector3 spawnOrigin = (vPos + nPos) * 0.5f;
+
+        // 3️⃣ Efekt
+        if (particleEffectManager != null)
+        {
+            particleEffectManager.PlayEffect(TileType.Vampyr, vPos);
+        }
+
+        // 4️⃣ Yok et
+        Destroy(vampire.gameObject);
+        Destroy(normalTile.gameObject);
+
+        yield return new WaitForSeconds(0.15f);
+
+        // 5️⃣ Normal tile’ları topla
+        List<Tile> normalTiles = new List<Tile>();
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Tile t = grid[x, y];
+                if (t != null && !t.isSpecial)
+                {
+                    normalTiles.Add(t);
+                }
+            }
+        }
+
+        // 6️⃣ Rastgele 3 tanesini seç
+        int spawnCount = Mathf.Min(3, normalTiles.Count);
+
+        for (int i = 0; i < spawnCount; i++)
+        {
+            Tile target = normalTiles[Random.Range(0, normalTiles.Count)];
+            normalTiles.Remove(target);
+
+            int tx = target.x;
+            int ty = target.y;
+
+            // 🔒 Hedef pozisyonu ÖNCE al
+            Vector3 targetWorldPos = target.transform.position;
+
+            // 🔒 Grid temizle
+            grid[tx, ty] = null;
+
+            // 🔒 Tile yok et
+            Destroy(target.gameObject);
+
+            yield return new WaitForSeconds(0.12f);
+
+            // 7️⃣ Yarasa animasyonla gitsin
+            yield return StartCoroutine(
+                AnimateBatToTarget(spawnOrigin, tx, ty, targetWorldPos)
+            );
+        }
+
+        // 8️⃣ Düşme & doldurma
+        yield return StartCoroutine(DropTiles());
+        yield return StartCoroutine(RefillTiles());
+
+        // 9️⃣ Match kontrol
+        List<Tile> matches = FindAllMatches();
+        if (matches.Count > 0)
+            yield return StartCoroutine(ResolveBoard());
+
+        // 🔟 Hamle
+        totalMoves--;
+        UpdateUI();
+
+        boardBusy = false;
+        CheckGameState();
+    }
+
+
+
+    IEnumerator AnimateBatToTarget(
+     Vector3 startPos,
+     int targetX,
+     int targetY,
+     Vector3 targetWorldPos
+ )
+    {
+        GameObject batObj =
+            Instantiate(batPrefab, startPos, Quaternion.identity, transform);
+
+        Tile bat = batObj.GetComponent<Tile>();
+
+        float duration = 0.6f + Random.Range(0.15f, 0.3f);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+
+            // ease-out (sona doğru yavaşlar)
+            float smoothT = 1f - Mathf.Pow(1f - t, 3f);
+
+            batObj.transform.position =
+                Vector3.Lerp(startPos, targetWorldPos, smoothT);
+
+            yield return null;
+        }
+
+        // Tam hedefe kilitle
+        batObj.transform.position = targetWorldPos;
+
+        // Tile bilgileri
+        bat.x = targetX;
+        bat.y = targetY;
+        bat.tileType = TileType.Bat;
+        bat.isSpecial = true;
+        bat.isBat = true;
+
+        grid[targetX, targetY] = bat;
+
+        if (particleEffectManager != null)
+        {
+            particleEffectManager.PlayEffect(TileType.Bat, targetWorldPos);
+        }
+    }
+
+
 }
