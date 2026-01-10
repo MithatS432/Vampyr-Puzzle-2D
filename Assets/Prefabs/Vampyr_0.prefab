@@ -75,8 +75,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 1859219789
-  m_SortingLayer: 1
+  m_SortingLayerID: 460401799
+  m_SortingLayer: 2
   m_SortingOrder: 0
   m_Sprite: {fileID: 7711399654269541706, guid: f4b23db970f066946a602fe39ad38960, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -144,5 +144,6 @@ MonoBehaviour:
   isBloodDrop: 0
   isVampire: 1
   isBat: 0
+  isRandomDestroyer: 0
   bloodDropColor: 6
   spriteRenderer: {fileID: 8253094633186288105}
